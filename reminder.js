@@ -316,7 +316,7 @@ app.post('/', async (req, res) => {
             return res.status(result.status).json(result);
         } else {
             // 未知请求类型
-            return res.status(400).json({ status: 400, message: "Unknown request type." });
+            return res.status(200).json({ status: 200, message: "Unknown request type." });
         }
     } catch (error) {
         logger.error(error.message);
