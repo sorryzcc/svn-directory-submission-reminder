@@ -39,10 +39,7 @@ async function handleWebhookRequest(reqBody) {
       for (const branch of branchRows) {
         const {
           directory_name,
-          responsible_person,
-          svn_lock_status,
-          svn_lock_whitelist,
-          svn_lock_disposable_whitelist
+          responsible_person
         } = branch;
   
         // 检查当前目录是否在请求的 paths 中
