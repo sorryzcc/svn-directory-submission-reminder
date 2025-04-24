@@ -1,1 +1,10 @@
-检查当前目录是否在请求的 paths 中，如果在，则打印出当前目录的responsible_person
+最后的输出有两种情况：
+
+1匹配到的目录是XXX，负责人是XXX 
+2没有匹配到任何目录
+
+PS C:\Users\v_jinlqi\Desktop\svn-directory-submission-reminder> node reminder.js
+INFO: 服务器已启动，监听地址：http://10.30.135.35:8080
+INFO: Received Request Body: {"user_name":"v_zccgzhang","operation_kind":"create","event_type":"svn_post_commit","user_id":346046,"user_email":"v_zccgzhang@tencent.com","project_id":971978,"repository":{"name":"PMGame_proj","description":null,"homepage":"https://git.woa.com/TIMIJ6_svn/PMGame_proj","svn_http_url":"https://svn.woa.com/TIMIJ6_svn/PMGame_proj","svn_ssh_url":"svn+ssh://svn.woa.com/TIMIJ6_svn/PMGame_proj"},"object_kind":"post_commit","action_kind":"svn client commit","revision":1,"message":"It is a test commit hook.","files":[],"paths":[],"total_files_count":0,"push_options":{},"push_timestamp":"2025-04-24T09:20:13+0000","userName":"v_zccgzhang","rep_name":"TIMIJ6/PMGame_proj","log":"It is a test commit hook.","commitTime":1745486413787}
+
+上面的paths":[]，是空，应该返回”paths":[]没有匹配到任何目录“

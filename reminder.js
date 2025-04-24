@@ -21,8 +21,6 @@ const pool = mysql.createPool({
 
 app.use(bodyParser.json());
 
-
-
 // 处理 Web 钩子请求的函数
 async function handleWebhookRequest(reqBody) {
   const { user_name, paths } = reqBody;
@@ -34,7 +32,6 @@ async function handleWebhookRequest(reqBody) {
     logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
 
     let hasMatchingBranch = false; // 标记是否有匹配的目录
-    let responseMessages = []; // 存储所有目录的响应消息
 
     for (const branch of branchRows) {
       const {
@@ -42,28 +39,27 @@ async function handleWebhookRequest(reqBody) {
         responsible_person
       } = branch;
 
+      logger.info(`正在检查目录 "${directory_name}" 是否匹配 paths: ${JSON.stringify(paths)}`);
+
       // 检查当前目录是否在请求的 paths 中
-      const isBranchIncluded = paths.some(path => path.includes(directory_name) || path.includes(responsible_person));
+      const isBranchIncluded = paths.some(path => path.includes(directory_name));
       if (!isBranchIncluded) {
         logger.info(`目录 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
         continue; // 如果当前目录不在请求的 paths 中，跳过
       }
 
       hasMatchingBranch = true; // 标记有匹配的目录
-      logger.info(`正在检查目录 "${directory_name}" (${responsible_person}) 的锁定状态`);
+      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${responsible_person}`); // 打印出 responsible_person
 
+      // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
       return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
     }
 
     // 如果没有任何匹配的目录，直接允许提交
     if (!hasMatchingBranch) {
-      logger.info("没有匹配的目录，允许提交");
+      logger.info("没有对应的目录");
       return { status: 200, message: "No matching branches found, allowing commit." };
     }
-
-    // 返回所有目录的响应消息
-    logger.info(`所有目录的响应消息：${responseMessages}`);
-    return { status: 200, messages: responseMessages };
   } catch (error) {
     logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
     return { status: 500, message: error.message };
@@ -78,99 +74,8 @@ app.post('/', async (req, res) => {
     const body = req.body;
     logger.info(`Received Request Body: ${JSON.stringify(body)}`);
 
-    // 判断是机器人请求还是 Web 钩子请求
-    if (body.from && body.webhook_url) {
-      // 处理机器人请求
-      let textContent = body.text?.content || '';
-      logger.info(`Text Content Received: ${textContent}`);
-
-      // 去掉指令前的“@svn机器人”部分
-      textContent = textContent.replace(/^@svn机器人\s*/, '').trim();
-      logger.info(`Processed Text Content: ${textContent}`);
-
-      const userresponsible_person = body.from.responsible_person; // 请求者的 responsible_person
-
-      // 提取目录标识符
-      let branchIdentifier = null;
-
-      if (lockMatch) {
-        branchIdentifier = lockMatch[1].trim();
-      } else if (unlockAllMatch) {
-        branchIdentifier = unlockAllMatch[1].trim();
-      } else if (disposableWhitelistMatch) {
-        branchIdentifier = disposableWhitelistMatch[1].trim();
-      }
-
-      // 如果没有匹配到任何指令，返回默认消息
-      if (!branchIdentifier) {
-        return res.status(200).json({
-          msgtype: 'text',
-          text: {
-            content: `未识别的指令，请重新输入。\n示例：\n lock b01rel\n unlockall b01rel\n unlock b01rel @v_zccgzhang(张匆匆)`
-          }
-        });
-      }
-
-      const [permissionResults] = await pool.execute(checkPermissionQuery, [branchIdentifier]);
-
-      if (permissionResults.length === 0) {
-        logger.info(`目录 ${branchIdentifier} 不存在`);
-        return res.status(200).json({
-          msgtype: 'text',
-          text: {
-            content: `目录 ${branchIdentifier} 不存在，请检查目录名称是否正确。`
-          }
-        });
-      }
-
-      const whitelist = permissionResults[0].svn_lock_whitelist;
-      logger.info(`Raw Whitelist Content for Branch ${branchIdentifier}: ${whitelist}`);
-
-      // 将白名单分割为数组并去除多余空格
-      const whitelistArray = whitelist.split(',').map(item => item.trim());
-      logger.info(`Parsed Whitelist Array for Branch ${branchIdentifier}: ${JSON.stringify(whitelistArray)}`);
-
-      // 检查用户是否在白名单中
-      if (!whitelistArray.includes(userresponsible_person)) {
-        logger.info(`请求者 ${userresponsible_person} 不在目录 ${branchIdentifier} 的永久白名单中，无权操作`);
-        return res.status(200).json({
-          msgtype: 'text',
-          text: {
-            content: `${userresponsible_person} 不在目录 ${branchIdentifier} 的永久白名单内，无权执行此操作。`
-          }
-        });
-      }
-
-      // 根据指令类型执行对应逻辑
-      if (unlockAllMatch) {
-        // 处理目录解锁逻辑
-        const success = await updateBranchLockStatus(branchIdentifier, 0);
-        const replyMessage = success
-          ? `已成功解锁目录 ${branchIdentifier}`
-          : `解锁目录 ${branchIdentifier} 失败，请检查目录是否存在`;
-        return res.status(200).json({ msgtype: 'text', text: { content: replyMessage } });
-      } else if (disposableWhitelistMatch) {
-        const usersPart = disposableWhitelistMatch[2].trim(); // 获取用户标识部分
-
-        // 提取用户标识
-        const words = usersPart.split(/\s+/); // 按空格分割
-        const matches = words
-          .filter(word => word.startsWith('@') && word.includes('(') && word.includes(')')) // 筛选符合条件的单词
-          .map(word => word.slice(1).split('(')[0].trim()); // 提取用户名部分
-        logger.info(`提取的所有用户标识: ${JSON.stringify(matches)}`);
-
-        // 调用增加一次性白名单逻辑
-        const success = await addDisposableWhitelist(branchIdentifier, matches.join(','));
-
-        // 构造回复消息
-        const addedUsers = matches.join(', '); // 将用户标识用逗号分隔
-        const replyMessage = success
-          ? `已成功为目录 ${branchIdentifier} 增加一次性白名单用户：${addedUsers}`
-          : `为目录 ${branchIdentifier} 增加一次性白名单用户失败，请检查目录或用户信息`;
-
-        return res.status(200).json({ msgtype: 'text', text: { content: replyMessage } });
-      }
-    } else if (body.user_name && body.operation_kind && body.event_type) {
+    // 判断是 post-commit 钩子请求
+    if (body.user_name && body.operation_kind && body.event_type === 'svn_post_commit') {
       // 处理 Web 钩子请求
       const result = await handleWebhookRequest(body);
       return res.status(result.status).json(result);
@@ -183,6 +88,104 @@ app.post('/', async (req, res) => {
     return res.status(500).json({ status: 500, message: error.message });
   }
 });
+
+// 处理 Web 钩子请求的函数
+async function handleWebhookRequest(reqBody) {
+  const { user_name, paths } = reqBody;
+
+  // 如果 paths 是空数组，直接返回“没有匹配到任何目录”
+  if (!Array.isArray(paths) || paths.length === 0) {
+    logger.info("paths 是空数组，没有匹配到任何目录");
+    return { status: 200, message: "paths 是空数组，没有匹配到任何目录" };
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
+    const [branchRows] = await conn.execute('SELECT * FROM SVN_directory_submission_reminder');
+    logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
+
+    let hasMatchingBranch = false; // 标记是否有匹配的目录
+
+    for (const branch of branchRows) {
+      const {
+        directory_name,
+        responsible_person
+      } = branch;
+
+      logger.info(`正在检查目录 "${directory_name}" 是否匹配 paths: ${JSON.stringify(paths)}`);
+
+      // 检查当前目录是否在请求的 paths 中
+      const isBranchIncluded = paths.some(path => path.includes(directory_name));
+      if (!isBranchIncluded) {
+        logger.info(`目录 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
+        continue; // 如果当前目录不在请求的 paths 中，跳过
+      }
+
+      hasMatchingBranch = true; // 标记有匹配的目录
+      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${responsible_person}`); // 打印出 responsible_person
+
+      // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
+      return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
+    }
+
+    // 如果没有任何匹配的目录，直接允许提交
+    if (!hasMatchingBranch) {
+      logger.info("没有匹配到任何目录");
+      return { status: 200, message: "没有匹配到任何目录" };
+    }
+  } catch (error) {
+    logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
+    return { status: 500, message: error.message };
+  } finally {
+    conn.release();
+  }
+}
+
+// 处理 Web 钩子请求的函数
+async function handleWebhookRequest(reqBody) {
+  const { user_name, paths } = reqBody;
+
+  const conn = await pool.getConnection();
+  try {
+    // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
+    const [branchRows] = await conn.execute('SELECT * FROM SVN_directory_submission_reminder');
+    logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
+
+    let hasMatchingBranch = false; // 标记是否有匹配的目录
+
+    for (const branch of branchRows) {
+      const {
+        directory_name,
+        responsible_person
+      } = branch;
+
+      // 检查当前目录是否在请求的 paths 中
+      const isBranchIncluded = paths.some(path => path.includes(directory_name));
+      if (!isBranchIncluded) {
+        logger.info(`目录 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
+        continue; // 如果当前目录不在请求的 paths 中，跳过
+      }
+
+      hasMatchingBranch = true; // 标记有匹配的目录
+      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${responsible_person}`); // 打印出 responsible_person
+
+      // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
+      return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
+    }
+
+    // 如果没有任何匹配的目录，直接允许提交
+    if (!hasMatchingBranch) {
+      logger.info("没有对应的目录");
+      return { status: 200, message: "No matching branches found, allowing commit." };
+    }
+  } catch (error) {
+    logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
+    return { status: 500, message: error.message };
+  } finally {
+    conn.release();
+  }
+}
 
 // 获取本机的 IPv4 地址
 function getLocalIPv4Address() {
