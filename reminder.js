@@ -27,10 +27,6 @@ app.use(bodyParser.json());
 async function handleWebhookRequest(reqBody) {
     const { user_name, paths } = reqBody;
   
-    if (!Array.isArray(paths) || paths.length === 0) {
-      return { status: 200, message: "No branches to check, allowing commit." };
-    }
-  
     const conn = await pool.getConnection();
     try {
       // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
