@@ -42,34 +42,34 @@ async function handleWebhookRequest(reqBody) {
   
       for (const branch of branchRows) {
         const {
-          svn_branch_name,
-          alias,
+          directory_name,
+          responsible_person,
           svn_lock_status,
           svn_lock_whitelist,
           svn_lock_disposable_whitelist
         } = branch;
   
         // 检查当前分支是否在请求的 paths 中
-        const isBranchIncluded = paths.some(path => path.includes(svn_branch_name) || path.includes(alias));
+        const isBranchIncluded = paths.some(path => path.includes(directory_name) || path.includes(responsible_person));
         if (!isBranchIncluded) {
-          logger.info(`分支 "${svn_branch_name}" (${alias}) 不在请求的 paths 中，跳过检查`);
+          logger.info(`分支 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
           continue; // 如果当前分支不在请求的 paths 中，跳过
         }
   
         hasMatchingBranch = true; // 标记有匹配的分支
-        logger.info(`正在检查分支 "${svn_branch_name}" (${alias}) 的锁定状态`);
+        logger.info(`正在检查分支 "${directory_name}" (${responsible_person}) 的锁定状态`);
   
         // 如果 svn_lock_status 为 0，直接允许提交
         if (svn_lock_status === 0) {
-          responseMessages.push(`分支 "${svn_branch_name}" (${alias}) 锁定状态为 0，允许提交`);
-          logger.info(`分支 "${svn_branch_name}" (${alias}) 锁定状态为 0，允许提交`);
+          responseMessages.push(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 0，允许提交`);
+          logger.info(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 0，允许提交`);
           continue;
         }
   
         // 检查 svn_lock_whitelist 是否包含 user_name
         if (svn_lock_whitelist.split(',').filter(Boolean).includes(user_name)) {
-          responseMessages.push(`用户 "${user_name}" 在永久白名单中，允许提交分支 "${svn_branch_name}" (${alias})`);
-          logger.info(`用户 "${user_name}" 在永久白名单中，允许提交分支 "${svn_branch_name}" (${alias})`);
+          responseMessages.push(`用户 "${user_name}" 在永久白名单中，允许提交分支 "${directory_name}" (${responsible_person})`);
+          logger.info(`用户 "${user_name}" 在永久白名单中，允许提交分支 "${directory_name}" (${responsible_person})`);
           continue;
         }
   
@@ -82,15 +82,15 @@ async function handleWebhookRequest(reqBody) {
   
 
   
-          responseMessages.push(`用户 "${user_name}" 在一次性白名单中，已移除并允许提交分支 "${svn_branch_name}" (${alias})`);
-          logger.info(`用户 "${user_name}" 在一次性白名单中，已移除并允许提交分支 "${svn_branch_name}" (${alias})`);
+          responseMessages.push(`用户 "${user_name}" 在一次性白名单中，已移除并允许提交分支 "${directory_name}" (${responsible_person})`);
+          logger.info(`用户 "${user_name}" 在一次性白名单中，已移除并允许提交分支 "${directory_name}" (${responsible_person})`);
           continue;
         }
   
         // 如果以上条件都不满足，则拒绝提交
-        responseMessages.push(`分支 "${svn_branch_name}" (${alias}) 锁定状态为 1，且用户 "${user_name}" 不在白名单中，拒绝提交`);
-        logger.error(`分支 "${svn_branch_name}" (${alias}) 锁定状态为 1，且用户 "${user_name}" 不在白名单中，拒绝提交`);
-        return { status: 500, message: `提交被拒绝：分支 "${svn_branch_name}" (${alias}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
+        responseMessages.push(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 1，且用户 "${user_name}" 不在白名单中，拒绝提交`);
+        logger.error(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 1，且用户 "${user_name}" 不在白名单中，拒绝提交`);
+        return { status: 500, message: `提交被拒绝：分支 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
       }
   
       // 如果没有任何匹配的分支，直接允许提交
@@ -126,7 +126,7 @@ app.post('/', async (req, res) => {
             textContent = textContent.replace(/^@svn机器人\s*/, '').trim();
             logger.info(`Processed Text Content: ${textContent}`);
 
-            const userAlias = body.from.alias; // 请求者的 alias
+            const userresponsible_person = body.from.responsible_person; // 请求者的 responsible_person
 
             // 匹配“锁库 分支名”指令
             const lockPattern = /^lock\s+(\S+)/;
@@ -182,12 +182,12 @@ app.post('/', async (req, res) => {
             logger.info(`Parsed Whitelist Array for Branch ${branchIdentifier}: ${JSON.stringify(whitelistArray)}`);
 
             // 检查用户是否在白名单中
-            if (!whitelistArray.includes(userAlias)) {
-                logger.info(`请求者 ${userAlias} 不在分支 ${branchIdentifier} 的永久白名单中，无权操作`);
+            if (!whitelistArray.includes(userresponsible_person)) {
+                logger.info(`请求者 ${userresponsible_person} 不在分支 ${branchIdentifier} 的永久白名单中，无权操作`);
                 return res.status(200).json({
                     msgtype: 'text',
                     text: {
-                        content: `${userAlias} 不在分支 ${branchIdentifier} 的永久白名单内，无权执行此操作。`
+                        content: `${userresponsible_person} 不在分支 ${branchIdentifier} 的永久白名单内，无权执行此操作。`
                     }
                 });
             }
@@ -247,9 +247,9 @@ function getLocalIPv4Address() {
   const interfaces = os.networkInterfaces(); // 获取所有网络接口
   for (const interfaceName in interfaces) {
     const iface = interfaces[interfaceName];
-    for (const alias of iface) {
-      if (alias.family === 'IPv4' && !alias.internal) {
-        return alias.address;
+    for (const responsible_person of iface) {
+      if (responsible_person.family === 'IPv4' && !responsible_person.internal) {
+        return responsible_person.address;
       }
     }
   }

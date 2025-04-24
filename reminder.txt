@@ -1,1 +1,1 @@
-reminder.txt
+检查当前目录是否在请求的 paths 中，如果在，则打印出当前目录的responsible_person
