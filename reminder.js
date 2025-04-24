@@ -33,12 +33,12 @@ async function handleWebhookRequest(reqBody) {
   
     const conn = await pool.getConnection();
     try {
-      // 查询 SVN_directory_submission_reminder 表，获取所有分支信息
+      // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
       const [branchRows] = await conn.execute('SELECT * FROM SVN_directory_submission_reminder');
-      logger.info(`从数据库中查询到的分支信息：${JSON.stringify(branchRows)}`);
+      logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
   
-      let hasMatchingBranch = false; // 标记是否有匹配的分支
-      let responseMessages = []; // 存储所有分支的响应消息
+      let hasMatchingBranch = false; // 标记是否有匹配的目录
+      let responseMessages = []; // 存储所有目录的响应消息
   
       for (const branch of branchRows) {
         const {
@@ -49,58 +49,27 @@ async function handleWebhookRequest(reqBody) {
           svn_lock_disposable_whitelist
         } = branch;
   
-        // 检查当前分支是否在请求的 paths 中
+        // 检查当前目录是否在请求的 paths 中
         const isBranchIncluded = paths.some(path => path.includes(directory_name) || path.includes(responsible_person));
         if (!isBranchIncluded) {
-          logger.info(`分支 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
-          continue; // 如果当前分支不在请求的 paths 中，跳过
+          logger.info(`目录 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
+          continue; // 如果当前目录不在请求的 paths 中，跳过
         }
   
-        hasMatchingBranch = true; // 标记有匹配的分支
-        logger.info(`正在检查分支 "${directory_name}" (${responsible_person}) 的锁定状态`);
+        hasMatchingBranch = true; // 标记有匹配的目录
+        logger.info(`正在检查目录 "${directory_name}" (${responsible_person}) 的锁定状态`);
   
-        // 如果 svn_lock_status 为 0，直接允许提交
-        if (svn_lock_status === 0) {
-          responseMessages.push(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 0，允许提交`);
-          logger.info(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 0，允许提交`);
-          continue;
-        }
-  
-        // 检查 svn_lock_whitelist 是否包含 user_name
-        if (svn_lock_whitelist.split(',').filter(Boolean).includes(user_name)) {
-          responseMessages.push(`用户 "${user_name}" 在永久白名单中，允许提交分支 "${directory_name}" (${responsible_person})`);
-          logger.info(`用户 "${user_name}" 在永久白名单中，允许提交分支 "${directory_name}" (${responsible_person})`);
-          continue;
-        }
-  
-        // 检查 svn_lock_disposable_whitelist 是否包含 user_name
-        const disposableWhitelistArray = svn_lock_disposable_whitelist.split(',').filter(Boolean);
-        const index = disposableWhitelistArray.indexOf(user_name);
-        if (index !== -1) {
-          disposableWhitelistArray.splice(index, 1); // 移除用户
-          const updatedWhitelist = disposableWhitelistArray.join(',');
-  
-
-  
-          responseMessages.push(`用户 "${user_name}" 在一次性白名单中，已移除并允许提交分支 "${directory_name}" (${responsible_person})`);
-          logger.info(`用户 "${user_name}" 在一次性白名单中，已移除并允许提交分支 "${directory_name}" (${responsible_person})`);
-          continue;
-        }
-  
-        // 如果以上条件都不满足，则拒绝提交
-        responseMessages.push(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 1，且用户 "${user_name}" 不在白名单中，拒绝提交`);
-        logger.error(`分支 "${directory_name}" (${responsible_person}) 锁定状态为 1，且用户 "${user_name}" 不在白名单中，拒绝提交`);
-        return { status: 500, message: `提交被拒绝：分支 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
+        return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
       }
   
-      // 如果没有任何匹配的分支，直接允许提交
+      // 如果没有任何匹配的目录，直接允许提交
       if (!hasMatchingBranch) {
-        logger.info("没有匹配的分支，允许提交");
+        logger.info("没有匹配的目录，允许提交");
         return { status: 200, message: "No matching branches found, allowing commit." };
       }
   
-      // 返回所有分支的响应消息
-      logger.info(`所有分支的响应消息：${responseMessages}`);
+      // 返回所有目录的响应消息
+      logger.info(`所有目录的响应消息：${responseMessages}`);
       return { status: 200, messages: responseMessages };
     } catch (error) {
       logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
@@ -128,20 +97,20 @@ app.post('/', async (req, res) => {
 
             const userresponsible_person = body.from.responsible_person; // 请求者的 responsible_person
 
-            // 匹配“锁库 分支名”指令
+            // 匹配“锁库 目录名”指令
             const lockPattern = /^lock\s+(\S+)/;
             const lockMatch = textContent.match(lockPattern);
 
-            // 匹配“开闸 分支名”指令
+            // 匹配“开闸 目录名”指令
             const unlockAllPattern = /^unlockall\s+(\S+)/;
             const unlockAllMatch = textContent.match(unlockAllPattern);
 
-            // 匹配“增加一次性白名单 分支名 用户名”指令
+            // 匹配“增加一次性白名单 目录名 用户名”指令
             const disposableWhitelistPattern = /^unlock\s+(\S+)\s+(.*)$/;
             const disposableWhitelistMatch = textContent.match(disposableWhitelistPattern);
             logger.info(`Lock Match: ${JSON.stringify(lockMatch)}, UnlockAll Match: ${JSON.stringify(unlockAllMatch)}, DisposableWhitelist Match: ${JSON.stringify(disposableWhitelistMatch)}`);
 
-            // 提取分支标识符
+            // 提取目录标识符
             let branchIdentifier = null;
 
             if (lockMatch) {
@@ -165,11 +134,11 @@ app.post('/', async (req, res) => {
             const [permissionResults] = await pool.execute(checkPermissionQuery, [branchIdentifier]);
 
             if (permissionResults.length === 0) {
-                logger.info(`分支 ${branchIdentifier} 不存在`);
+                logger.info(`目录 ${branchIdentifier} 不存在`);
                 return res.status(200).json({
                     msgtype: 'text',
                     text: {
-                        content: `分支 ${branchIdentifier} 不存在，请检查分支名称是否正确。`
+                        content: `目录 ${branchIdentifier} 不存在，请检查目录名称是否正确。`
                     }
                 });
             }
@@ -183,29 +152,29 @@ app.post('/', async (req, res) => {
 
             // 检查用户是否在白名单中
             if (!whitelistArray.includes(userresponsible_person)) {
-                logger.info(`请求者 ${userresponsible_person} 不在分支 ${branchIdentifier} 的永久白名单中，无权操作`);
+                logger.info(`请求者 ${userresponsible_person} 不在目录 ${branchIdentifier} 的永久白名单中，无权操作`);
                 return res.status(200).json({
                     msgtype: 'text',
                     text: {
-                        content: `${userresponsible_person} 不在分支 ${branchIdentifier} 的永久白名单内，无权执行此操作。`
+                        content: `${userresponsible_person} 不在目录 ${branchIdentifier} 的永久白名单内，无权执行此操作。`
                     }
                 });
             }
 
             // 根据指令类型执行对应逻辑
             if (lockMatch) {
-                // 处理分支锁定逻辑
+                // 处理目录锁定逻辑
                 const success = await updateBranchLockStatus(branchIdentifier, 1);
                 const replyMessage = success
-                    ? `已成功锁定分支 ${branchIdentifier}`
-                    : `锁定分支 ${branchIdentifier} 失败，请检查分支是否存在`;
+                    ? `已成功锁定目录 ${branchIdentifier}`
+                    : `锁定目录 ${branchIdentifier} 失败，请检查目录是否存在`;
                 return res.status(200).json({ msgtype: 'text', text: { content: replyMessage } });
             } else if (unlockAllMatch) {
-                // 处理分支解锁逻辑
+                // 处理目录解锁逻辑
                 const success = await updateBranchLockStatus(branchIdentifier, 0);
                 const replyMessage = success
-                    ? `已成功解锁分支 ${branchIdentifier}`
-                    : `解锁分支 ${branchIdentifier} 失败，请检查分支是否存在`;
+                    ? `已成功解锁目录 ${branchIdentifier}`
+                    : `解锁目录 ${branchIdentifier} 失败，请检查目录是否存在`;
                 return res.status(200).json({ msgtype: 'text', text: { content: replyMessage } });
             } else if (disposableWhitelistMatch) {
                 const usersPart = disposableWhitelistMatch[2].trim(); // 获取用户标识部分
@@ -223,8 +192,8 @@ app.post('/', async (req, res) => {
                 // 构造回复消息
                 const addedUsers = matches.join(', '); // 将用户标识用逗号分隔
                 const replyMessage = success
-                    ? `已成功为分支 ${branchIdentifier} 增加一次性白名单用户：${addedUsers}`
-                    : `为分支 ${branchIdentifier} 增加一次性白名单用户失败，请检查分支或用户信息`;
+                    ? `已成功为目录 ${branchIdentifier} 增加一次性白名单用户：${addedUsers}`
+                    : `为目录 ${branchIdentifier} 增加一次性白名单用户失败，请检查目录或用户信息`;
 
                 return res.status(200).json({ msgtype: 'text', text: { content: replyMessage } });
             }
