@@ -1,2 +1,1 @@
-修改代码
-找到提交的目录，即把数组paths里面公共路径(前面一样的)提取出来，如果包含dictinary_name，则打印出数据库里匹配的dictionary_name和对应的reponsible_name。如果没有匹配的的,则打印出,'提交的文件不在匹配规则内'
+当responsible_person的值不为空时，服务停止
