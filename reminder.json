@@ -2,9 +2,9 @@
     "object_kind": "post_commit",
     "operation_kind": "update",
     "action_kind": "svn client commit",
-    "user_name": "v_hchenglv",
-    "user_id": 234754,
-    "user_email": "v_hchenglv@tencent.com",
+    "user_name": "pmgameclient",
+    "user_id": 280052,
+    "user_email": "pmgameclient@tencent.com",
     "project_id": 971978,
     "repository": {
         "name": "PMGame_proj",
@@ -15,58 +15,67 @@
         "url": "svn+ssh://svn.woa.com/TIMIJ6_svn/PMGame_proj",
         "visibility_level": 0
     },
-    "timestamp": "2025-04-25T01:37:00+0000",
-    "revision": 1017334,
-    "message": "--bug=140891413 【国内B03】【双端】【训练区】icon资源总单，修复后贴图 主城入口",
+    "timestamp": "2025-04-25T01:44:49+0000",
+    "revision": 1017342,
+    "message": "source revision84376 huangzexin_nshx --bug=141703340 【国内B03】【商城】当我时装页签没有选中列表中任何时装时  此时我本身角色所穿戴的时装的背景显示不对 commit by @黄泽鑫 review by @minlai",
     "files": [
         {
-            "type": "U",
-            "file": "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/OuterResources/ABResources/SpriteAtlas/Mobile/DLC0/System/sa_ui_lobbybatchtc.spriteatlas",
-            "directory": false,
-            "isFile": true,
+            "type": "_U",
+            "file": "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/",
+            "directory": true,
+            "isFile": false,
+            "size": -1,
+            "insertions": 0,
+            "deletions": 0
+        },
+        {
+            "type": "_U",
+            "file": "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/",
+            "directory": true,
+            "isFile": false,
+            "size": -1,
+            "insertions": 0,
+            "deletions": 0
+        },
+        {
+            "type": "_U",
+            "file": "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/",
+            "directory": true,
+            "isFile": false,
+            "size": -1,
+            "insertions": 0,
+            "deletions": 0
+        },
+        {
+            "type": "_U",
+            "file": "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/Lua/",
+            "directory": true,
+            "isFile": false,
+            "size": -1,
+            "insertions": 0,
+            "deletions": 0
+        },
+        {
+            "type": "_U",
+            "file": "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/Lua/M/Lobby/",
+            "directory": true,
+            "isFile": false,
+            "size": -1,
+            "insertions": 0,
+            "deletions": 0
+        },
+        {
+            "type": "_U",
+            "file": "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/Lua/M/Lobby/Shop/",
+            "directory": true,
+            "isFile": false,
             "size": -1,
             "insertions": 0,
             "deletions": 0
         },
         {
             "type": "U",
-            "file": "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/OuterResources/ABResources/UI/OutSide/Lobby/pref_GamelobbyDevicePage.prefab",
-            "directory": false,
-            "isFile": true,
-            "size": -1,
-            "insertions": 0,
-            "deletions": 0
-        },
-        {
-            "type": "U",
-            "file": "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/OuterResources/ABResources/UI/OutSide/RedDot/pref_RedDot_TrainingGround.prefab",
-            "directory": false,
-            "isFile": true,
-            "size": -1,
-            "insertions": 0,
-            "deletions": 0
-        },
-        {
-            "type": "A",
-            "file": "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/ResourcesRaw/UIForSpriteAtlas/Mobile/DLC0/System/lobby/LobbyBatchTC_truecolor/t_lobby_btn_SelfTrainingEntrance.png",
-            "directory": false,
-            "isFile": true,
-            "size": -1,
-            "insertions": 0,
-            "deletions": 0
-        },
-        {
-            "type": "A",
-            "file": "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/ResourcesRaw/UIForSpriteAtlas/Mobile/DLC0/System/lobby/LobbyBatchTC_truecolor/t_lobby_btn_SelfTrainingEntrance.png.meta",
-            "directory": false,
-            "isFile": true,
-            "size": -1,
-            "insertions": 0,
-            "deletions": 0
-        },
-        {
-            "type": "U",
-            "file": "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/ResourcesRaw/UIForSpriteAtlas/autoGenAtlas.txt",
+            "file": "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/Lua/M/Lobby/Shop/Mall/lua_Shop3DBgCtrl.txt",
             "directory": false,
             "isFile": true,
             "size": -1,
@@ -75,18 +84,20 @@
         }
     ],
     "paths": [
-        "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/OuterResources/ABResources/SpriteAtlas/Mobile/DLC0/System/",
-        "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/OuterResources/ABResources/UI/OutSide/Lobby/",
-        "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/OuterResources/ABResources/UI/OutSide/RedDot/",
-        "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/ResourcesRaw/UIForSpriteAtlas/",
-        "branches/Mainland/PUB/Mainland_Pub_Beta03_Release/PMGameClient/PMGame/Assets/ResourcesRaw/UIForSpriteAtlas/Mobile/DLC0/System/lobby/LobbyBatchTC_truecolor/"
+        "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/",
+        "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/",
+        "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/",
+        "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/",
+        "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/Lua/M/",
+        "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/Lua/M/Lobby/",
+        "branches/PMGameDEV_CN/PM_Mainland_Trunk_20230321_r552586/PMGameClient/PMGame/Assets/OuterResources/ABResources/Lua/M/Lobby/Shop/Mall/"
     ],
-    "total_files_count": 6,
+    "total_files_count": 7,
     "create_and_update": null,
     "push_options": {},
-    "push_timestamp": "2025-04-25T01:37:01+0000",
-    "userName": "v_hchenglv",
+    "push_timestamp": "2025-04-25T01:44:50+0000",
+    "userName": "pmgameclient",
     "rep_name": "TIMIJ6/PMGame_proj",
-    "log": "--bug=140891413 【国内B03】【双端】【训练区】icon资源总单，修复后贴图 主城入口",
-    "commitTime": 1745545020000
+    "log": "source revision84376 huangzexin_nshx --bug=141703340 【国内B03】【商城】当我时装页签没有选中列表中任何时装时  此时我本身角色所穿戴的时装的背景显示不对 commit by @黄泽鑫 review by @minlai",
+    "commitTime": 1745545489000
 }

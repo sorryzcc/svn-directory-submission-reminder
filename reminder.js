@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2/promise'); // 使用 promise 版本
 const os = require('os'); // 用于获取网络接口信息
-const logger = require('./logger.js')
+const logger = require('./logger.js');
 
 const app = express();
 const PORT = process.argv[2] || 8080;
@@ -21,9 +21,75 @@ const pool = mysql.createPool({
 
 app.use(bodyParser.json());
 
+// 获取公共路径函数
+function getCommonPath(paths) {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    logger.info("paths 是空数组或无效数据");
+    return '';
+  }
+
+  // 初始化公共路径为第一个路径
+  let commonPath = paths[0];
+  logger.info(`初始公共路径为：${commonPath}`);
+
+  // 遍历剩余路径，逐步缩短公共路径
+  for (let i = 1; i < paths.length; i++) {
+    const currentPath = paths[i];
+    logger.info(`正在比较路径：${commonPath} 和 ${currentPath}`);
+
+    let j = 0;
+    while (
+      j < commonPath.length &&
+      j < currentPath.length &&
+      commonPath[j] === currentPath[j]
+    ) {
+      j++;
+    }
+
+    // 更新公共路径
+    commonPath = commonPath.slice(0, j);
+    logger.info(`更新后的公共路径为：${commonPath}`);
+
+    // 如果公共路径已经为空，则无需继续比较
+    if (commonPath === '') {
+      break;
+    }
+  }
+
+  // 去掉末尾的斜杠（如果有）
+  commonPath = commonPath.replace(/\/$/, '');
+  logger.info(`最终提取的公共路径为：${commonPath}`);
+  return commonPath;
+}
+
 // 处理 Web 钩子请求的函数
 async function handleWebhookRequest(reqBody) {
   const { user_name, paths } = reqBody;
+
+  // 打印完整的请求体内容，方便调试
+  logger.info(`完整请求体内容：${JSON.stringify(reqBody)}`);
+
+  // 检查 paths 是否存在
+  if (!Array.isArray(paths) || paths.length === 0) {
+    logger.info("paths 是空数组或无效数据");
+    return { status: 200, message: "提交的文件不在匹配规则内" };
+  }
+
+  // 打印 paths 的详细信息
+  logger.info(`paths 的类型是：${typeof paths}`);
+  logger.info(`paths 是否是数组：${Array.isArray(paths)}`);
+  logger.info(`paths 的内容：${JSON.stringify(paths)}`);
+
+  // 获取公共路径
+  const commonPath = getCommonPath(paths);
+
+  // 如果没有提取到公共路径，直接返回“提交的文件不在匹配规则内”
+  if (!commonPath) {
+    logger.info("未能提取到公共路径，提交的文件不在匹配规则内");
+    return { status: 200, message: "提交的文件不在匹配规则内" };
+  }
+
+  logger.info(`从 paths 提取的公共路径为：${commonPath}`);
 
   const conn = await pool.getConnection();
   try {
@@ -34,18 +100,16 @@ async function handleWebhookRequest(reqBody) {
     let hasMatchingBranch = false; // 标记是否有匹配的目录
 
     for (const branch of branchRows) {
-      const {
-        directory_name,
-        responsible_person
-      } = branch;
+      const { directory_name, responsible_person } = branch;
 
-      logger.info(`正在检查目录 "${directory_name}" 是否匹配 paths: ${JSON.stringify(paths)}`);
+      // 检查当前目录是否在公共路径或 paths 中
+      const isBranchIncluded =
+        commonPath.includes(directory_name) ||
+        paths.some(path => path.includes(directory_name));
 
-      // 检查当前目录是否在请求的 paths 中
-      const isBranchIncluded = paths.some(path => path.includes(directory_name));
       if (!isBranchIncluded) {
-        logger.info(`目录 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
-        continue; // 如果当前目录不在请求的 paths 中，跳过
+        logger.info(`目录 "${directory_name}" (${responsible_person}) 不在提交的路径中，跳过检查`);
+        continue; // 如果当前目录不在提交的路径中，跳过
       }
 
       hasMatchingBranch = true; // 标记有匹配的目录
@@ -55,10 +119,10 @@ async function handleWebhookRequest(reqBody) {
       return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
     }
 
-    // 如果没有任何匹配的目录，直接允许提交
+    // 如果没有任何匹配的目录，打印“提交的文件不在匹配规则内”
     if (!hasMatchingBranch) {
-      logger.info("没有对应的目录");
-      return { status: 200, message: "No matching branches found, allowing commit." };
+      logger.info("提交的文件不在匹配规则内");
+      return { status: 200, message: "提交的文件不在匹配规则内" };
     }
   } catch (error) {
     logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
@@ -74,127 +138,30 @@ app.post('/', async (req, res) => {
     const body = req.body;
     logger.info(`Received Request Body: ${JSON.stringify(body)}`);
 
-    // 判断是 post-commit 钩子请求
-    if (body.user_name && body.operation_kind && body.event_type === 'svn_post_commit') {
+    // 判断是否包含必要的字段
+    if (body.user_name && body.operation_kind && Array.isArray(body.paths)) {
       // 处理 Web 钩子请求
       const result = await handleWebhookRequest(body);
       return res.status(result.status).json(result);
     } else {
-      // 未知请求类型
-      return res.status(200).json({ status: 200, message: "Unknown request type." });
+      // 打印缺少的字段信息
+      logger.info("请求体缺少必要字段：user_name, operation_kind 或 paths");
+      return res.status(400).json({ status: 400, message: "请求体缺少必要字段：user_name, operation_kind 或 paths" });
     }
   } catch (error) {
-    logger.error(error.message);
+    logger.error(`处理请求时发生错误：${error.message}`);
     return res.status(500).json({ status: 500, message: error.message });
   }
 });
-
-// 处理 Web 钩子请求的函数
-async function handleWebhookRequest(reqBody) {
-  const { user_name, paths } = reqBody;
-
-  // 如果 paths 是空数组，直接返回“没有匹配到任何目录”
-  if (!Array.isArray(paths) || paths.length === 0) {
-    logger.info("paths 是空数组，没有匹配到任何目录");
-    return { status: 200, message: "paths 是空数组，没有匹配到任何目录" };
-  }
-
-  const conn = await pool.getConnection();
-  try {
-    // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
-    const [branchRows] = await conn.execute('SELECT * FROM SVN_directory_submission_reminder');
-    logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
-
-    let hasMatchingBranch = false; // 标记是否有匹配的目录
-
-    for (const branch of branchRows) {
-      const {
-        directory_name,
-        responsible_person
-      } = branch;
-
-      logger.info(`正在检查目录 "${directory_name}" 是否匹配 paths: ${JSON.stringify(paths)}`);
-
-      // 检查当前目录是否在请求的 paths 中
-      const isBranchIncluded = paths.some(path => path.includes(directory_name));
-      if (!isBranchIncluded) {
-        logger.info(`目录 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
-        continue; // 如果当前目录不在请求的 paths 中，跳过
-      }
-
-      hasMatchingBranch = true; // 标记有匹配的目录
-      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${responsible_person}`); // 打印出 responsible_person
-
-      // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
-      return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
-    }
-
-    // 如果没有任何匹配的目录，直接允许提交
-    if (!hasMatchingBranch) {
-      logger.info("没有匹配到任何目录");
-      return { status: 200, message: "没有匹配到任何目录" };
-    }
-  } catch (error) {
-    logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
-    return { status: 500, message: error.message };
-  } finally {
-    conn.release();
-  }
-}
-
-// 处理 Web 钩子请求的函数
-async function handleWebhookRequest(reqBody) {
-  const { user_name, paths } = reqBody;
-
-  const conn = await pool.getConnection();
-  try {
-    // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
-    const [branchRows] = await conn.execute('SELECT * FROM SVN_directory_submission_reminder');
-    logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
-
-    let hasMatchingBranch = false; // 标记是否有匹配的目录
-
-    for (const branch of branchRows) {
-      const {
-        directory_name,
-        responsible_person
-      } = branch;
-
-      // 检查当前目录是否在请求的 paths 中
-      const isBranchIncluded = paths.some(path => path.includes(directory_name));
-      if (!isBranchIncluded) {
-        logger.info(`目录 "${directory_name}" (${responsible_person}) 不在请求的 paths 中，跳过检查`);
-        continue; // 如果当前目录不在请求的 paths 中，跳过
-      }
-
-      hasMatchingBranch = true; // 标记有匹配的目录
-      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${responsible_person}`); // 打印出 responsible_person
-
-      // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
-      return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
-    }
-
-    // 如果没有任何匹配的目录，直接允许提交
-    if (!hasMatchingBranch) {
-      logger.info("没有对应的目录");
-      return { status: 200, message: "No matching branches found, allowing commit." };
-    }
-  } catch (error) {
-    logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
-    return { status: 500, message: error.message };
-  } finally {
-    conn.release();
-  }
-}
 
 // 获取本机的 IPv4 地址
 function getLocalIPv4Address() {
   const interfaces = os.networkInterfaces(); // 获取所有网络接口
   for (const interfaceName in interfaces) {
     const iface = interfaces[interfaceName];
-    for (const responsible_person of iface) {
-      if (responsible_person.family === 'IPv4' && !responsible_person.internal) {
-        return responsible_person.address;
+    for (const alias of iface) {
+      if (alias.family === 'IPv4' && !alias.internal) {
+        return alias.address;
       }
     }
   }
