@@ -2,12 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2/promise'); // 使用 promise 版本
 const os = require('os'); // 用于获取网络接口信息
-
-// 简单的日志实现
-const logger = {
-  info: (msg) => console.log(`INFO: ${msg}`),
-  error: (msg) => console.error(`ERROR: ${msg}`),
-};
+const logger = require('./logger.js');
 
 const app = express();
 const PORT = process.argv[2] || 8080;
@@ -96,10 +91,8 @@ async function handleWebhookRequest(reqBody) {
 
   logger.info(`从 paths 提取的公共路径为：${commonPath}`);
 
-  let conn;
+  const conn = await pool.getConnection();
   try {
-    conn = await pool.getConnection();
-
     // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
     const [branchRows] = await conn.execute('SELECT * FROM SVN_directory_submission_reminder');
     logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
@@ -108,12 +101,6 @@ async function handleWebhookRequest(reqBody) {
 
     for (const branch of branchRows) {
       const { directory_name, responsible_person } = branch;
-
-      // 检查字段是否有效
-      if (!directory_name || !responsible_person) {
-        logger.warn(`无效的目录信息：directory_name=${directory_name}, responsible_person=${responsible_person}`);
-        continue;
-      }
 
       // 检查当前目录是否在公共路径或 paths 中
       const isBranchIncluded =
@@ -126,11 +113,39 @@ async function handleWebhookRequest(reqBody) {
       }
 
       hasMatchingBranch = true; // 标记有匹配的目录
-      const safeResponsiblePerson = responsible_person.trim() || '未知负责人';
-      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${safeResponsiblePerson}`); // 打印出 responsible_person
+      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${responsible_person}`); // 打印出 responsible_person
 
       // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
-      return { status: 500, message: `提交被拒绝：目录 "${directory_name}" (${safeResponsiblePerson}) 已锁定，且用户 "${user_name}" 不在白名单中。` };
+      if (responsible_person) {
+        logger.info(`检测到负责人：${responsible_person}，准备发送 curl 请求`);
+
+        // 构造 curl 命令
+        const curlCommand = `
+          curl -X POST https://devops.woa.com/ms/process/api/external/pipelines/5008f6e6361445abaf413486456dc3ae/build \
+          -H "Content-Type: application/json" \
+          -H "X-DEVOPS-PROJECT-ID: pmgame" \
+          -H "X-DEVOPS-UID: " \
+          -d "{\"allResponsibles\":\"${responsible_person}\"}"
+        `;
+
+        // 执行 curl 命令
+        exec(curlCommand, (error, stdout, stderr) => {
+          if (error) {
+            logger.error(`执行 curl 请求失败：${error.message}`);
+            return;
+          }
+          if (stderr) {
+            logger.error(`curl 请求返回错误：${stderr}`);
+            return;
+          }
+          logger.info(`curl 请求成功，响应内容：${stdout}`);
+        });
+      }
+
+      return {
+        status: 500,
+        message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。`,
+      };
     }
 
     // 如果没有任何匹配的目录，打印“提交的文件不在匹配规则内”
@@ -142,9 +157,7 @@ async function handleWebhookRequest(reqBody) {
     logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
     return { status: 500, message: error.message };
   } finally {
-    if (conn) {
-      conn.release().catch(err => logger.error(`释放数据库连接失败：${err.message}`));
-    }
+    conn.release();
   }
 }
 
@@ -195,10 +208,6 @@ const server = app.listen(PORT, () => {
 // 简单处理程序终止信号以优雅地关闭服务器
 process.on('SIGINT', async () => {
   logger.info("Shutting down server...");
-  try {
-    await pool.end(); // 异步关闭数据库连接池
-  } catch (err) {
-    logger.error(`关闭数据库连接池时发生错误：${err.message}`);
-  }
+  await pool.end(); // 异步关闭数据库连接池
   process.exit();
 });
