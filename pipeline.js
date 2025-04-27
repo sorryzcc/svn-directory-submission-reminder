@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2/promise'); // 使用 promise 版本
+const axios = require('axios');
 const os = require('os'); // 用于获取网络接口信息
 const logger = require('./logger.js');
 
@@ -62,23 +63,49 @@ function getCommonPath(paths) {
   return commonPath;
 }
 
+// 发送 HTTP 请求
+async function sendCurlRequest(responsible_person) {
+  try {
+    const response = await axios.post(
+      'https://devops.woa.com/ms/process/api/external/pipelines/5008f6e6361445abaf413486456dc3ae/build',
+      { allResponsibles: responsible_person },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-DEVOPS-PROJECT-ID': 'pmgame',
+          'X-DEVOPS-UID': '',
+        },
+        timeout: 5000, // 超时时间为 5 秒
+      }
+    );
+
+    logger.info({
+      message: "curl 请求成功",
+      data: response.data,
+    });
+  } catch (error) {
+    logger.error({
+      message: "curl 请求失败",
+      error: error.message,
+    });
+  }
+}
+
 // 处理 Web 钩子请求的函数
 async function handleWebhookRequest(reqBody) {
   const { user_name, paths } = reqBody;
 
   // 打印完整的请求体内容，方便调试
-  logger.info(`完整请求体内容：${JSON.stringify(reqBody)}`);
+  logger.info({
+    message: "完整请求体内容",
+    body: reqBody,
+  });
 
   // 检查 paths 是否存在
   if (!Array.isArray(paths) || paths.length === 0) {
     logger.info("paths 是空数组或无效数据");
     return { status: 200, message: "提交的文件不在匹配规则内" };
   }
-
-  // 打印 paths 的详细信息
-  logger.info(`paths 的类型是：${typeof paths}`);
-  logger.info(`paths 是否是数组：${Array.isArray(paths)}`);
-  logger.info(`paths 的内容：${JSON.stringify(paths)}`);
 
   // 获取公共路径
   const commonPath = getCommonPath(paths);
@@ -95,7 +122,10 @@ async function handleWebhookRequest(reqBody) {
   try {
     // 查询 SVN_directory_submission_reminder 表，获取所有目录信息
     const [branchRows] = await conn.execute('SELECT * FROM SVN_directory_submission_reminder');
-    logger.info(`从数据库中查询到的目录信息：${JSON.stringify(branchRows)}`);
+    logger.info({
+      message: "从数据库中查询到的目录信息",
+      rows: branchRows,
+    });
 
     let hasMatchingBranch = false; // 标记是否有匹配的目录
 
@@ -104,8 +134,8 @@ async function handleWebhookRequest(reqBody) {
 
       // 检查当前目录是否在公共路径或 paths 中
       const isBranchIncluded =
-        commonPath.includes(directory_name) ||
-        paths.some(path => path.includes(directory_name));
+        new RegExp(`^${directory_name}`).test(commonPath) ||
+        paths.some(path => new RegExp(`^${directory_name}`).test(path));
 
       if (!isBranchIncluded) {
         logger.info(`目录 "${directory_name}" (${responsible_person}) 不在提交的路径中，跳过检查`);
@@ -113,38 +143,21 @@ async function handleWebhookRequest(reqBody) {
       }
 
       hasMatchingBranch = true; // 标记有匹配的目录
-      logger.info(`找到匹配的目录 "${directory_name}"，对应的负责人是：${responsible_person}`); // 打印出 responsible_person
+      logger.info({
+        message: "找到匹配的目录",
+        directory_name,
+        responsible_person,
+      });
 
       // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
       if (responsible_person) {
         logger.info(`检测到负责人：${responsible_person}，准备发送 curl 请求`);
-
-        // 构造 curl 命令
-        const curlCommand = `
-          curl -X POST https://devops.woa.com/ms/process/api/external/pipelines/5008f6e6361445abaf413486456dc3ae/build \
-          -H "Content-Type: application/json" \
-          -H "X-DEVOPS-PROJECT-ID: pmgame" \
-          -H "X-DEVOPS-UID: " \
-          -d "{\"allResponsibles\":\"${responsible_person}\"}"
-        `;
-
-        // 执行 curl 命令
-        exec(curlCommand, (error, stdout, stderr) => {
-          if (error) {
-            logger.error(`执行 curl 请求失败：${error.message}`);
-            return;
-          }
-          if (stderr) {
-            logger.error(`curl 请求返回错误：${stderr}`);
-            return;
-          }
-          logger.info(`curl 请求成功，响应内容：${stdout}`);
-        });
+        await sendCurlRequest(responsible_person);
       }
 
       return {
         status: 500,
-        message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定，且用户 "${user_name}" 不在白名单中。`,
+        message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定`,
       };
     }
 
@@ -154,7 +167,10 @@ async function handleWebhookRequest(reqBody) {
       return { status: 200, message: "提交的文件不在匹配规则内" };
     }
   } catch (error) {
-    logger.error(`处理 Web 钩子请求时发生错误：${error.message}`);
+    logger.error({
+      message: "处理 Web 钩子请求时发生错误",
+      error: error.message,
+    });
     return { status: 500, message: error.message };
   } finally {
     conn.release();
@@ -165,7 +181,10 @@ async function handleWebhookRequest(reqBody) {
 app.post('/', async (req, res) => {
   try {
     const body = req.body;
-    logger.info(`Received Request Body: ${JSON.stringify(body)}`);
+    logger.info({
+      message: "收到请求体",
+      body,
+    });
 
     // 判断是否包含必要的字段
     if (body.user_name && body.operation_kind && Array.isArray(body.paths)) {
@@ -178,7 +197,10 @@ app.post('/', async (req, res) => {
       return res.status(400).json({ status: 400, message: "请求体缺少必要字段：user_name, operation_kind 或 paths" });
     }
   } catch (error) {
-    logger.error(`处理请求时发生错误：${error.message}`);
+    logger.error({
+      message: "处理请求时发生错误",
+      error: error.message,
+    });
     return res.status(500).json({ status: 500, message: error.message });
   }
 });
