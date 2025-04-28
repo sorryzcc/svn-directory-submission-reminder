@@ -94,7 +94,7 @@ async function sendCurlRequest(responsible_person) {
 
 // 处理 Web 钩子请求的函数
 async function handleWebhookRequest(reqBody) {
-  const { user_name, paths } = reqBody;
+  const { user_name, paths, push_timestamp, message, files } = reqBody;
 
   // 打印完整的请求体内容，方便调试
   logger.info({
@@ -154,16 +154,26 @@ async function handleWebhookRequest(reqBody) {
       if (responsible_person) {
         logger.info(`检测到负责人：${responsible_person}，准备发送 curl 请求`);
 
-        // 将负责人写入 responsible_person.txt 文件
+        // 构造写入文件的内容
+        const content = `
+通知接收者：${responsible_person}
+1. 提交人：${user_name}
+2. 提交时间：${push_timestamp}
+3. 提交日志：${message}
+4. 提交文件名：${files.map(file => file.file).join(', ')}
+5. 触发了哪个目录的规则：${directory_name}
+`;
+
+        // 将内容写入 responsible_person.txt 文件
         const filePath = './responsible_person.txt';
-        fs.writeFile(filePath, responsible_person, (err) => {
+        fs.writeFile(filePath, content, (err) => {
           if (err) {
             logger.error({
               message: "写入 responsible_person.txt 文件失败",
               error: err.message,
             });
           } else {
-            logger.info(`成功将负责人 ${responsible_person} 写入文件 ${filePath}`);
+            logger.info(`成功将负责人及相关信息写入文件 ${filePath}`);
           }
         });
 
@@ -171,7 +181,7 @@ async function handleWebhookRequest(reqBody) {
       }
 
       return {
-        status: 500,
+        status: 200,
         message: `提交被拒绝：目录 "${directory_name}" (${responsible_person}) 已锁定`,
       };
     }
@@ -186,7 +196,7 @@ async function handleWebhookRequest(reqBody) {
       message: "处理 Web 钩子请求时发生错误",
       error: error.message,
     });
-    return { status: 500, message: error.message };
+    return { status: 200, message: error.message };
   } finally {
     conn.release();
   }
@@ -216,7 +226,7 @@ app.post('/', async (req, res) => {
       message: "处理请求时发生错误",
       error: error.message,
     });
-    return res.status(500).json({ status: 500, message: error.message });
+    return res.status(200).json({ status: 200, message: error.message });
   }
 });
 

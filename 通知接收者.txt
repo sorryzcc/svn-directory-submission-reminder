@@ -1,9 +1,1 @@
-修改写入到responsible_person.txt的内容
-
-"通知接收者"：var_name（这个值就是responsible_person）
-1提交人:res.userName
-2提交时间:res.push_timestamp
-3提交日志:res.message
-4提交文件名:res里面数组的files的file
-5触发了哪个目录的规则:当前数据库的directory_name的值
-
+这个代码的var_name取值修改为：提交人后后面的值
