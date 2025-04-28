@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const mysql = require('mysql2/promise'); // 使用 promise 版本
 const axios = require('axios');
 const os = require('os'); // 用于获取网络接口信息
+const fs = require('fs'); // 用于文件操作
 const logger = require('./logger.js');
 
 const app = express();
@@ -152,6 +153,20 @@ async function handleWebhookRequest(reqBody) {
       // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
       if (responsible_person) {
         logger.info(`检测到负责人：${responsible_person}，准备发送 curl 请求`);
+
+        // 将负责人写入 responsible_person.txt 文件
+        const filePath = './responsible_person.txt';
+        fs.writeFile(filePath, responsible_person, (err) => {
+          if (err) {
+            logger.error({
+              message: "写入 responsible_person.txt 文件失败",
+              error: err.message,
+            });
+          } else {
+            logger.info(`成功将负责人 ${responsible_person} 写入文件 ${filePath}`);
+          }
+        });
+
         await sendCurlRequest(responsible_person);
       }
 
