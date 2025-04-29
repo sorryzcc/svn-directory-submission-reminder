@@ -5,6 +5,7 @@ const axios = require('axios');
 const os = require('os'); // 用于获取网络接口信息
 const fs = require('fs'); // 用于文件操作
 const logger = require('./logger.js');
+const moment = require('moment-timezone')
 
 const app = express();
 const PORT = process.argv[2] || 8080;
@@ -153,12 +154,12 @@ async function handleWebhookRequest(reqBody) {
       // 如果需要进一步处理（如锁定逻辑），可以在这里添加代码
       if (responsible_person) {
         logger.info(`检测到负责人：${responsible_person}，准备发送 curl 请求`);
-
+        const beijingTime = moment.utc(push_timestamp).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
         // 构造写入文件的内容
         const content = `
 通知接收者：${responsible_person}
 1. 提交人：${user_name}
-2. 提交时间：${push_timestamp}
+2. 提交时间：${beijingTime}
 3. 提交日志：${message}
 4. 提交文件名：${files.map(file => file.file).join(', ')}
 5. 触发了哪个目录的规则：${directory_name}
